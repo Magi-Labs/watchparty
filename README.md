@@ -11,7 +11,7 @@ Watchparty extends the original Huddle Chrome extension with shared playback con
 
 ## Run locally
 
-Install the dependencies with `npm ci` and start the relay with `npm start`. The default port is `4000`. Set `WATCHPARTY_DASHBOARD_PASSWORD` in the relay environment to enable the dashboard at `/`. The Basic Auth username is `admin`. The health endpoint is `/healthz`.
+Install the dependencies with `npm ci` and start the relay with `npm start`. The default port is `4000`. Set `WATCHPARTY_DASHBOARD_PASSWORD` in the relay environment to enable the dashboard at `/`. Set `WATCHPARTY_DASHBOARD_USERNAME` to override the default username `admin`. The health endpoint is `/healthz`.
 
 Point `syncServerUrl` in `extension/scripts/config.js` at your relay. Open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**. Select the `extension/` directory or the extracted `watchparty-extension/` directory from the public release. The public build has a blank relay key and is intended for self-hosting.
 

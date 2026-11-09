@@ -125,7 +125,10 @@ function enterRoom(socket, roomCode, room, name) {
 // HTTP Routes
 // ============================================================================
 
-const dashboardLogin = requireDashboardLogin(process.env.WATCHPARTY_DASHBOARD_PASSWORD);
+const dashboardLogin = requireDashboardLogin(
+  process.env.WATCHPARTY_DASHBOARD_USERNAME || "admin",
+  process.env.WATCHPARTY_DASHBOARD_PASSWORD,
+);
 app.get("/", dashboardLogin, createDashboard(rooms, watchedUrls));
 app.get("/extension.zip", dashboardLogin,
   createExtensionDownload(accessKey.toString(), process.env.WATCHPARTY_EXTENSION_RELAY_URL));

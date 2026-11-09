@@ -6,7 +6,8 @@ The Dockerfile runs the Express and Socket.IO relay on port `4000`. Place it beh
 | --- | --- |
 | `PORT` | Relay port. Defaults to `4000`. |
 | `WATCHPARTY_ACCESS_KEY` | Shared relay key for Socket.IO clients. Required in production. |
-| `WATCHPARTY_DASHBOARD_PASSWORD` | Password for HTTP Basic Auth at `/`, using username `admin`. If unset, the dashboard returns HTTP 503. |
+| `WATCHPARTY_DASHBOARD_USERNAME` | Username for dashboard HTTP Basic Auth. Defaults to `admin`. |
+| `WATCHPARTY_DASHBOARD_PASSWORD` | Password for dashboard HTTP Basic Auth. If unset, the dashboard returns HTTP 503. |
 | `WATCHPARTY_EXTENSION_RELAY_URL` | Relay URL to embed in the dashboard download. Defaults to the URL in `extension/scripts/config.js`. |
 
 Use `GET /healthz` for health checks. The dashboard lists active rooms with one count per connected participant and groups URLs since process start. It drops query parameters except for the YouTube video ID. Restarting the relay clears room state and the URL history.

@@ -20,8 +20,8 @@ function digest(value) {
   return createHash("sha256").update(value).digest();
 }
 
-function requireDashboardLogin(password) {
-  const expected = password && digest(`admin:${password}`);
+function requireDashboardLogin(username, password) {
+  const expected = password && digest(`${username}:${password}`);
 
   return (req, res, next) => {
     res.set("Cache-Control", "no-store");
