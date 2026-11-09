@@ -5,6 +5,8 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY server/ server/
+COPY extension/ extension/
+COPY LICENSE ./
 
 USER node
 EXPOSE 4000

@@ -1,14 +1,20 @@
 /* === Huddle — Initialization === */
 
 /* ---------- Auto-Join via URL Hash ---------- */
-function checkAutoJoin() {
-  const params = new URLSearchParams(window.location.hash.slice(1));
-  const roomCode = params.get("huddle_room")?.toUpperCase();
-  if (!/^HUD-[A-Z0-9]{4}$/.test(roomCode ?? "")) return false;
-
-  const name = params.get("name");
+function checkAutoJoin(invite) {
+  if (!invite) return false;
+  const { roomCode, name } = invite;
   if (name) saveDisplayName(name);
-  history.replaceState(null, "", window.location.pathname + window.location.search);
+
+  const url = new URL(window.location.href);
+  const params = new URLSearchParams(url.hash.slice(1));
+  if (params.get("huddle_room")?.toUpperCase() === roomCode) {
+    params.delete("huddle_room");
+    if (name) params.delete("name");
+    url.hash = params.toString();
+    history.replaceState(history.state, "", url.href);
+  }
+
   pendingInviteCode = roomCode;
   if (socket.connected) rejoinRoom();
   return true;
@@ -47,8 +53,11 @@ function init() {
   loadDisplayName(() => {
     restoreRoomSession(() => {
       buildSidebar();
-      if (!checkAutoJoin() && socket.connected) rejoinRoom();
-      window.addEventListener("hashchange", checkAutoJoin);
+      window.removeEventListener("hashchange", rememberRoomInvite);
+      const invite = readRoomInvite(window.location.href) ?? earlyRoomInvite;
+      earlyRoomInvite = null;
+      if (!checkAutoJoin(invite) && socket.connected) rejoinRoom();
+      window.addEventListener("hashchange", (event) => checkAutoJoin(readRoomInvite(event.newURL)));
     });
   });
 }

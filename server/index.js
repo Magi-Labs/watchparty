@@ -6,6 +6,8 @@
 const express = require("express");
 const http = require("http");
 const { randomUUID, timingSafeEqual } = require("node:crypto");
+const { createDashboard, getAnalyticsUrl, requireDashboardLogin } = require("./dashboard");
+const { createExtensionDownload } = require("./extension-download");
 
 const app = express();
 const server = http.createServer(app);
@@ -40,6 +42,7 @@ io.use(function (socket, next) {
 // ============================================================================
 
 const rooms = new Map();
+const watchedUrls = new Map();
 const streamingHosts = new Set([
   "www.youtube.com", "www.netflix.com", "www.primevideo.com", "clips.twitch.tv", "hotstar.com",
 ]);
@@ -122,7 +125,13 @@ function enterRoom(socket, roomCode, room, name) {
 // HTTP Routes
 // ============================================================================
 
-// CORS middleware for HTTP routes
+const dashboardLogin = requireDashboardLogin(process.env.WATCHPARTY_DASHBOARD_PASSWORD);
+app.get("/", dashboardLogin, createDashboard(rooms, watchedUrls));
+app.get("/extension.zip", dashboardLogin,
+  createExtensionDownload(accessKey.toString(), process.env.WATCHPARTY_EXTENSION_RELAY_URL));
+app.get("/healthz", (req, res) => res.json({ status: "running" }));
+
+// CORS middleware for room lookups
 app.use(function (req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
@@ -130,15 +139,6 @@ app.use(function (req, res, next) {
     "Origin, X-Requested-With, Content-Type, Accept",
   );
   next();
-});
-
-// Health-check / landing
-app.get("/", function (req, res) {
-  res.json({
-    name: "Huddle Sync Server",
-    status: "running",
-    activeRooms: rooms.size,
-  });
 });
 
 /**
@@ -180,7 +180,10 @@ io.on("connection", (socket) => {
     videoUrl.hash = "";
 
     const roomCode = generateRoomCode();
+    const analyticsUrl = getAnalyticsUrl(videoUrl);
+    watchedUrls.set(analyticsUrl, (watchedUrls.get(analyticsUrl) ?? 0) + 1);
     const room = {
+      analyticsUrl,
       video: {
         videoUrl: videoUrl.href,
         videoTitle: typeof data.videoTitle === "string" ? data.videoTitle.slice(0, 300) : "",

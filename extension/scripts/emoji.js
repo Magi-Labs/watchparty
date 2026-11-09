@@ -40,32 +40,14 @@ function makeEmojiButton(emoji, label, choose) {
 }
 
 function setupRoomEmoji(chatInput) {
-  const reactionButton = document.getElementById("huddle-reactions-button");
   const reactionBar = document.getElementById("huddle-reactions");
   const pickerButton = document.getElementById("huddle-emoji-button");
   const picker = document.getElementById("huddle-emoji-picker");
   const search = document.getElementById("huddle-emoji-search");
   const results = document.getElementById("huddle-emoji-results");
 
-  function toggleReactions(open) {
-    reactionBar.hidden = !open;
-    reactionButton.setAttribute("aria-expanded", open);
-  }
-
-  reactionButton.addEventListener("click", () => {
-    toggleReactions(reactionBar.hidden);
-    if (!reactionBar.hidden) reactionBar.querySelector("button").focus();
-  });
-  reactionBar.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    event.stopPropagation();
-    toggleReactions(false);
-    reactionButton.focus();
-  });
   for (const [emoji, label] of quickReactions) {
     reactionBar.append(makeEmojiButton(emoji, label, () => {
-      toggleReactions(false);
-      reactionButton.focus();
       if (!socket.connected) {
         showToast("Reconnect to the room to send a reaction.", "warning");
         return;

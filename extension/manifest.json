@@ -2,12 +2,23 @@
   "manifest_version": 3,
   "name": "Huddle",
   "description": "Watch videos together in sync and chat with everyone in your room.",
-  "version": "1.2.4",
+  "version": "1.2.10",
   "action": {},
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://www.netflix.com/*",
+        "https://*.hotstar.com/*",
+        "https://www.primevideo.com/*",
+        "https://clips.twitch.tv/*"
+      ],
+      "js": ["scripts/invite.js"],
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "https://www.youtube.com/*",

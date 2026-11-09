@@ -1,22 +1,20 @@
 /* === Huddle — Sidebar === */
 
 /* ---------- UI Sidebar Visibility Helpers ---------- */
+function setSidebarOpen(open) {
+  const sidebar = document.getElementById("huddle-sidebar");
+  const button = document.getElementById("huddle-open-btn");
+  sidebar?.classList.toggle("huddle-visible", open);
+  button?.classList.toggle("sidebar-open", open);
+  button?.setAttribute("aria-expanded", open);
+}
+
 function openSidebar() {
-  const s = document.getElementById("huddle-sidebar");
-  const b = document.getElementById("huddle-open-btn");
-  if (s && b) {
-    s.classList.add("huddle-visible");
-    b.classList.add("sidebar-open");
-  }
+  setSidebarOpen(true);
 }
 
 function closeSidebar() {
-  const s = document.getElementById("huddle-sidebar");
-  const b = document.getElementById("huddle-open-btn");
-  if (s && b) {
-    s.classList.remove("huddle-visible");
-    b.classList.remove("sidebar-open");
-  }
+  setSidebarOpen(false);
 }
 
 function addSidebarResizeHandle(sidebar) {
@@ -110,7 +108,6 @@ function buildSidebar() {
   header.className = "huddle-header";
   header.innerHTML = `
     <div class="huddle-logo">
-      <span class="huddle-logo-icon" id="huddle-logo-icon">🎬</span>
       <span class="huddle-logo-text">Huddle</span>
     </div>
   `;
@@ -163,20 +160,22 @@ function buildSidebar() {
   sidebar.appendChild(roomPage);
 
   // Open/toggle button
-  const openBtn = document.createElement("div");
+  const openBtn = document.createElement("button");
+  openBtn.type = "button";
   openBtn.className = "huddle-open-btn";
   openBtn.id = "huddle-open-btn";
-  openBtn.innerHTML = `<span class="huddle-btn-icon-wrapper" style="display:inline-block; writing-mode:horizontal-tb; line-height:1;">🎬</span>`;
+  openBtn.title = "Toggle Huddle panel";
+  openBtn.setAttribute("aria-label", openBtn.title);
+  openBtn.setAttribute("aria-controls", sidebar.id);
+  openBtn.setAttribute("aria-expanded", "false");
 
   // Apply saved visibility preference
   if (localStorage.getItem("huddle_show_floating_btn") === "false") {
     openBtn.style.display = "none";
   }
 
-  openBtn.addEventListener("click", () => {
-    sidebar.classList.toggle("huddle-visible");
-    openBtn.classList.toggle("sidebar-open");
-  });
+  const toggleSidebar = () => setSidebarOpen(!sidebar.classList.contains("huddle-visible"));
+  openBtn.addEventListener("click", toggleSidebar);
 
   // Handle fullscreen changes to hide/show the floating button and sidebar
   const handleFullscreenChange = () => {
@@ -201,15 +200,8 @@ function buildSidebar() {
   document.addEventListener("MSFullscreenChange", handleFullscreenChange);
 
   // Extension Icon Click Listener (from background.js)
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "HUDDLE_TOGGLE_SIDEBAR") {
-      const s = document.getElementById("huddle-sidebar");
-      const b = document.getElementById("huddle-open-btn");
-      if (s && b) {
-        s.classList.toggle("huddle-visible");
-        b.classList.toggle("sidebar-open");
-      }
-    }
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === "HUDDLE_TOGGLE_SIDEBAR") toggleSidebar();
   });
 
   // Append both to DOM together to avoid reflow between inserts

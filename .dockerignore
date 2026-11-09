@@ -3,3 +3,7 @@
 !package-lock.json
 !server/
 !server/**
+!extension/
+!extension/**
+extension/**/.DS_Store
+!LICENSE
