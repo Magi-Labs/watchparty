@@ -5,7 +5,7 @@
 
 const express = require("express");
 const http = require("http");
-const { timingSafeEqual } = require("node:crypto");
+const { randomUUID, timingSafeEqual } = require("node:crypto");
 
 const app = express();
 const server = http.createServer(app);
@@ -63,6 +63,21 @@ function generateRoomCode() {
 }
 
 const EMPTY_ROOM_TIMEOUT = 30_000;
+const quickReactions = new Set(["❤️", "👍", "😂", "👏", "🎉", "😮", "😢", "🔥"]);
+const ROOM_MESSAGE_LIMIT = 100;
+const playbackActions = new Map([
+  ["play", "resumed at"],
+  ["pause", "paused at"],
+  ["seek", "jumped to"],
+]);
+
+function formatPlaybackTime(time) {
+  const seconds = Math.floor(time);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor(seconds / 60) % 60;
+  const remainder = String(seconds % 60).padStart(2, "0");
+  return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${remainder}` : `${minutes}:${remainder}`;
+}
 
 function getPlayback(room) {
   const elapsed = room.paused ? 0 : (Date.now() - room.updatedAt) / 1000;
@@ -177,6 +192,7 @@ io.on("connection", (socket) => {
       paused: data.paused !== false,
       updatedAt: Date.now(),
       members: new Map(),
+      messages: new Map(),
       emptyTimer: null,
     };
     rooms.set(roomCode, room);
@@ -207,12 +223,35 @@ io.on("connection", (socket) => {
       return acknowledge(false);
     }
 
-    io.to(roomCode).emit("roomChat", {
+    const reply = room.messages.get(data.replyTo);
+    if (data.replyTo != null && !reply) return acknowledge(false);
+
+    const entry = {
       roomCode,
+      id: randomUUID(),
       senderId: socket.id,
       name: room.members.get(socket.id),
       message,
-    });
+      reply: reply ? { name: reply.name, message: reply.message } : null,
+    };
+    room.messages.set(entry.id, entry);
+    if (room.messages.size > ROOM_MESSAGE_LIMIT) {
+      room.messages.delete(room.messages.keys().next().value);
+    }
+    io.to(roomCode).emit("roomChat", entry);
+    acknowledge(true);
+  });
+
+  socket.on("roomReaction", (data, acknowledge) => {
+    if (typeof acknowledge !== "function") return;
+    const { roomCode } = socket.data;
+    const room = rooms.get(roomCode);
+    const now = Date.now();
+    if (!room?.members.has(socket.id) || data?.roomCode !== roomCode || !quickReactions.has(data.emoji) ||
+        now - (socket.data.lastReaction ?? 0) < 300) return acknowledge(false);
+
+    socket.data.lastReaction = now;
+    io.to(roomCode).emit("roomReaction", { roomCode, emoji: data.emoji, name: room.members.get(socket.id) });
     acknowledge(true);
   });
 
@@ -222,12 +261,21 @@ io.on("connection", (socket) => {
     if (!room?.members.has(socket.id) || data?.roomCode !== roomCode) return;
     const { time, paused, type } = data;
     if (!Number.isFinite(time) || time < 0 || typeof paused !== "boolean") return;
-    if (!["play", "pause", "seek"].includes(type)) return;
+    const action = playbackActions.get(type);
+    if (!action) return;
 
     room.time = time;
     room.paused = paused;
     room.updatedAt = Date.now();
     socket.to(roomCode).emit("videoSync", { roomCode, time, paused, type });
+    const position = formatPlaybackTime(time);
+    const participant = room.members.get(socket.id);
+    io.to(roomCode).emit("roomChat", {
+      roomCode,
+      name: "Huddle",
+      message: `${participant} ${action} ${position}`,
+      activity: true,
+    });
   });
 });
 

@@ -86,26 +86,72 @@ function renderRoomView() {
   page.innerHTML = `
     <div class="huddle-room-toolbar">
       <strong id="huddle-room-code-display"></strong>
-      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-copy-invite" type="button">Copy invite</button>
+      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-copy-invite"
+        type="button" aria-label="Copy invite link" title="Copy invite link">
+        <!-- Lucide link icon. See vendor/LUCIDE-LICENSE.txt. -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+      </button>
+      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-reactions-button"
+        type="button" aria-label="Quick reactions" title="Quick reactions"
+        aria-controls="huddle-reactions" aria-expanded="false">🎉</button>
       <button class="huddle-btn huddle-btn-small" id="huddle-leave-room-btn" type="button">Leave</button>
     </div>
+    <div class="huddle-emoji-grid" id="huddle-reactions" role="group" aria-label="Quick reactions" hidden></div>
+    <input class="huddle-input" id="huddle-invite-url" aria-label="Invite link" readonly hidden>
     <div id="huddle-room-chat" role="log" aria-label="Room chat"></div>
+    <div id="huddle-reply-preview" hidden>
+      <div class="huddle-reply-quote"><strong></strong><span></span></div>
+      <button class="huddle-reply-button" id="huddle-cancel-reply" type="button" aria-label="Cancel reply">✕</button>
+    </div>
     <form id="huddle-room-chat-form">
+      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-emoji-button"
+        type="button" aria-label="Choose emoji" title="Choose emoji" aria-haspopup="dialog">☺</button>
       <input class="huddle-input" id="huddle-room-chat-input" aria-label="Chat message"
         placeholder="Type a message" maxlength="300" required>
       <button class="huddle-btn huddle-btn-secondary huddle-btn-small" type="submit">Send</button>
     </form>
+    <dialog id="huddle-emoji-picker" aria-labelledby="huddle-emoji-title">
+      <div class="huddle-emoji-header">
+        <strong id="huddle-emoji-title">Emoji</strong>
+        <form method="dialog"><button class="huddle-reply-button" aria-label="Close emoji picker">✕</button></form>
+      </div>
+      <input class="huddle-input" id="huddle-emoji-search" type="search" aria-label="Search emojis" placeholder="Search emojis">
+      <div id="huddle-emoji-results"></div>
+    </dialog>
   `;
 
   document.getElementById("huddle-room-code-display").textContent = currentRoomCode;
-  document.getElementById("huddle-copy-invite").addEventListener("click", async () => {
+  const inviteButton = document.getElementById("huddle-copy-invite");
+  const inviteInput = document.getElementById("huddle-invite-url");
+  inviteButton.addEventListener("click", async () => {
     const invite = new URL(roomVideoUrl);
     invite.hash = new URLSearchParams({ huddle_room: currentRoomCode }).toString();
+    let copied = false;
     try {
       await navigator.clipboard.writeText(invite.href);
-      showToast("Invite link copied!");
+      copied = true;
     } catch {
-      showToast("Could not copy the invite. Share the room code instead.", "error");
+      inviteInput.value = invite.href;
+      inviteInput.hidden = false;
+      inviteInput.focus();
+      inviteInput.select();
+      try {
+        copied = document.execCommand("copy");
+      } catch {
+        // Leave the link selected for manual copying.
+      }
+    }
+
+    if (copied) {
+      inviteInput.hidden = true;
+      inviteButton.focus();
+      showToast("Invite link copied!");
+    } else {
+      showToast("Press Ctrl+C or ⌘C to copy the selected invite link.", "info");
     }
   });
   document.getElementById("huddle-leave-room-btn").addEventListener("click", handleLeaveRoom);
@@ -113,7 +159,14 @@ function renderRoomView() {
 
   const chatForm = document.getElementById("huddle-room-chat-form");
   const chatInput = document.getElementById("huddle-room-chat-input");
-  const chatSend = chatForm.querySelector("button");
+  const chatSend = chatForm.querySelector('[type="submit"]');
+  setupRoomEmoji(chatInput);
+  renderReplyPreview();
+  document.getElementById("huddle-cancel-reply").addEventListener("click", () => {
+    roomChatReply = null;
+    renderReplyPreview();
+    chatInput.focus();
+  });
   chatInput.addEventListener("keydown", (event) => event.stopPropagation());
   chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -126,30 +179,79 @@ function renderRoomView() {
 
     chatSend.disabled = true;
     const draft = chatInput.value;
-    socket.timeout(5000).emit("roomChat", { roomCode: currentRoomCode, message }, (error, sent) => {
+    const reply = roomChatReply;
+    socket.timeout(5000).emit("roomChat", { roomCode: currentRoomCode, message, replyTo: reply?.id }, (error, sent) => {
       chatSend.disabled = false;
       if (error || !sent) {
-        showToast("Chat message could not be confirmed.", "error");
+        showToast(reply ? "Could not send the reply. Try clearing the quoted message." : "Chat message could not be confirmed.", "error");
         return;
       }
       if (chatInput.value === draft) chatInput.value = "";
+      if (roomChatReply === reply) {
+        roomChatReply = null;
+        renderReplyPreview();
+      }
     });
   });
 
+}
+
+function renderReplyPreview() {
+  const preview = document.getElementById("huddle-reply-preview");
+  preview.hidden = !roomChatReply;
+  if (roomChatReply) {
+    preview.querySelector("strong").textContent = `Replying to ${roomChatReply.name}`;
+    preview.querySelector("span").textContent = roomChatReply.message;
+  }
 }
 
 function renderRoomChat() {
   const chat = document.getElementById("huddle-room-chat");
   if (!chat) return;
 
-  const messages = roomChatMessages.map(({ name, message, own }) => {
+  const messages = roomChatMessages.map(({ id, name, message, own, activity, reply }) => {
+    if (activity) {
+      const line = document.createElement("div");
+      line.className = "huddle-chat-activity";
+      line.textContent = message;
+      return line;
+    }
+
     const bubble = document.createElement("div");
     bubble.className = own ? "huddle-chat-bubble huddle-chat-own" : "huddle-chat-bubble";
+    const header = document.createElement("div");
+    header.className = "huddle-chat-message-header";
     const sender = document.createElement("strong");
     sender.textContent = name;
+    header.append(sender);
+    if (id) {
+      const replyButton = document.createElement("button");
+      replyButton.type = "button";
+      replyButton.className = "huddle-reply-button";
+      replyButton.setAttribute("aria-label", `Reply to ${name}`);
+      replyButton.title = "Reply";
+      replyButton.textContent = "↩";
+      replyButton.addEventListener("click", () => {
+        roomChatReply = { id, name, message };
+        renderReplyPreview();
+        document.getElementById("huddle-room-chat-input").focus();
+      });
+      header.append(replyButton);
+    }
+    bubble.append(header);
+    if (reply) {
+      const quote = document.createElement("blockquote");
+      quote.className = "huddle-reply-quote";
+      const quotedName = document.createElement("strong");
+      quotedName.textContent = reply.name;
+      const quotedText = document.createElement("span");
+      quotedText.textContent = reply.message;
+      quote.append(quotedName, quotedText);
+      bubble.append(quote);
+    }
     const body = document.createElement("div");
     body.textContent = message;
-    bubble.append(sender, body);
+    bubble.append(body);
     return bubble;
   });
   if (messages.length === 0) {

@@ -19,6 +19,82 @@ function closeSidebar() {
   }
 }
 
+function addSidebarResizeHandle(sidebar) {
+  const handle = document.createElement("div");
+  handle.className = "huddle-resize-handle";
+  handle.tabIndex = 0;
+  handle.setAttribute("role", "separator");
+  handle.setAttribute("aria-label", "Huddle panel width");
+  handle.setAttribute("aria-orientation", "vertical");
+  handle.setAttribute("aria-controls", sidebar.id);
+  handle.title = "Drag to resize Huddle";
+  sidebar.appendChild(handle);
+
+  let width = 340;
+  let drag = null;
+  const maxWidth = () => Math.min(720, Math.floor(window.innerWidth * 0.65));
+  const minWidth = () => Math.min(240, maxWidth());
+  const clampWidth = (value) => Math.max(minWidth(), Math.min(maxWidth(), Math.round(value)));
+
+  function applyWidth() {
+    document.documentElement.style.setProperty("--huddle-preferred-width", `${width}px`);
+    handle.setAttribute("aria-valuemin", minWidth());
+    handle.setAttribute("aria-valuemax", maxWidth());
+    handle.setAttribute("aria-valuenow", clampWidth(width));
+  }
+
+  function saveWidth() {
+    chrome.storage.local.set({ huddle_panel_width: width });
+  }
+
+  applyWidth();
+  chrome.storage.local.get({ huddle_panel_width: 340 }, ({ huddle_panel_width }) => {
+    if (!drag && Number.isFinite(huddle_panel_width) && huddle_panel_width > 0) {
+      width = huddle_panel_width;
+      applyWidth();
+    }
+  });
+  window.addEventListener("resize", applyWidth);
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || drag) return;
+    event.preventDefault();
+    handle.focus({ preventScroll: true });
+    drag = { id: event.pointerId, x: event.clientX, width, renderedWidth: sidebar.getBoundingClientRect().width };
+    handle.setPointerCapture(event.pointerId);
+    document.documentElement.classList.add("huddle-resizing");
+  });
+  handle.addEventListener("pointermove", (event) => {
+    if (drag?.id !== event.pointerId) return;
+    if (event.clientX === drag.x && width === drag.width) return;
+    width = clampWidth(drag.renderedWidth + drag.x - event.clientX);
+    applyWidth();
+  });
+
+  function finishResize(event) {
+    if (drag?.id !== event.pointerId) return;
+    if (event.type !== "pointerup") width = drag.width;
+    if (width !== drag.width) saveWidth();
+    drag = null;
+    document.documentElement.classList.remove("huddle-resizing");
+    applyWidth();
+  }
+
+  handle.addEventListener("pointerup", finishResize);
+  handle.addEventListener("pointercancel", finishResize);
+  handle.addEventListener("lostpointercapture", finishResize);
+  handle.addEventListener("keydown", (event) => {
+    const steps = { ArrowLeft: 20, ArrowRight: -20 };
+    const step = steps[event.key];
+    if (typeof step !== "number") return;
+    event.preventDefault();
+    event.stopPropagation();
+    width = clampWidth(clampWidth(width) + step);
+    applyWidth();
+    saveWidth();
+  });
+}
+
 /* ---------- UI: Build Sidebar ---------- */
 function buildSidebar() {
   if (document.getElementById("huddle-sidebar")) return;
@@ -27,6 +103,7 @@ function buildSidebar() {
   const sidebar = document.createElement("div");
   sidebar.className = "huddle-sidebar"; // Starts closed by default via CSS (translateX 100%)
   sidebar.id = "huddle-sidebar";
+  addSidebarResizeHandle(sidebar);
 
   // Header
   const header = document.createElement("div");
@@ -38,10 +115,21 @@ function buildSidebar() {
     </div>
   `;
 
+  addThemeToggle(sidebar, header);
+
   const dockBtn = document.createElement("button");
   dockBtn.type = "button";
   dockBtn.className = "huddle-dock-btn";
-  dockBtn.textContent = "Dock panel";
+  dockBtn.setAttribute("aria-label", "Dock panel");
+  dockBtn.dataset.tooltip = "Dock panel";
+  dockBtn.innerHTML = `
+    <!-- Lucide panel-right icon. See vendor/LUCIDE-LICENSE.txt. -->
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M15 3v18" />
+    </svg>
+  `;
   dockBtn.setAttribute("aria-pressed", localStorage.getItem("huddle_docked") === "true");
   sidebar.classList.toggle("huddle-docked", dockBtn.getAttribute("aria-pressed") === "true");
   dockBtn.addEventListener("click", () => {

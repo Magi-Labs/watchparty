@@ -75,7 +75,10 @@ function saveDisplayName(name) {
 
 /* ---------- Room Session State Helpers ---------- */
 function saveRoomSession(roomCode) {
-  if (currentRoomCode !== roomCode) roomChatMessages.length = 0;
+  if (currentRoomCode !== roomCode) {
+    roomChatMessages.length = 0;
+    roomChatReply = null;
+  }
   currentRoomCode = roomCode;
   try {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
@@ -95,6 +98,7 @@ function saveRoomSession(roomCode) {
 
 function clearRoomSession() {
   roomChatMessages.length = 0;
+  roomChatReply = null;
   currentRoomCode = null;
   roomVideoUrl = null;
   try {

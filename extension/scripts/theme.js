@@ -1,6 +1,38 @@
 /* === Huddle — Theme === */
 
 /* ---------- UI Theme Management Helpers ---------- */
+function addThemeToggle(sidebar, header) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "huddle-theme-btn";
+  button.setAttribute("aria-label", "Dark mode");
+  button.disabled = true;
+
+  function applyDarkMode(dark) {
+    sidebar.classList.toggle("huddle-dark", dark);
+    button.setAttribute("aria-pressed", dark);
+    button.textContent = dark ? "☀" : "☾";
+    button.title = dark ? "Switch to light mode" : "Switch to dark mode";
+  }
+
+  applyDarkMode(false);
+  chrome.storage.local.get({ huddle_dark_mode: false }, ({ huddle_dark_mode }) => {
+    applyDarkMode(huddle_dark_mode === true);
+    button.disabled = false;
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.huddle_dark_mode) {
+      applyDarkMode(changes.huddle_dark_mode.newValue === true);
+    }
+  });
+  button.addEventListener("click", () => {
+    const dark = !sidebar.classList.contains("huddle-dark");
+    applyDarkMode(dark);
+    chrome.storage.local.set({ huddle_dark_mode: dark });
+  });
+  header.appendChild(button);
+}
+
 function applyDynamicTheme(sourcePlatform) {
   const sidebar = document.getElementById("huddle-sidebar");
   if (!sidebar) return;
@@ -57,7 +89,7 @@ function applyDynamicTheme(sourcePlatform) {
   sidebar.style.setProperty("--hud-primary", theme["primary"]);
   sidebar.style.setProperty("--hud-primary-light", theme["primary-light"]);
   sidebar.style.setProperty("--hud-secondary", theme["secondary"]);
-  sidebar.style.setProperty("--hud-bg-cream", theme["bg-cream"]);
+  sidebar.style.setProperty("--hud-platform-bg", theme["bg-cream"]);
 
   // Update floating button variables as well
   const openBtn = document.getElementById("huddle-open-btn");

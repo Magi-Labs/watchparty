@@ -8,6 +8,7 @@ let roomVideoUrl = null;
 let pendingInviteCode = null;
 let displayName = "";
 const roomChatMessages = [];
+let roomChatReply = null;
 let isConnectedToTwitch = false;
 let twitchAccessToken = null;
 let twitchUserInfo = null;

@@ -62,11 +62,15 @@ socket.on("joinError", ({ roomCode, message }) => {
   showToast(message, "error");
 });
 
-socket.on("roomChat", ({ roomCode, senderId, name, message }) => {
+socket.on("roomChat", ({ roomCode, id, senderId, name, message, activity, reply }) => {
   if (roomCode !== currentRoomCode) return;
-  roomChatMessages.push({ name, message, own: senderId === mySocketId });
+  roomChatMessages.push({ id, name, message, activity, reply, own: senderId === mySocketId });
   if (roomChatMessages.length > 50) roomChatMessages.shift();
   renderRoomChat();
+});
+
+socket.on("roomReaction", ({ roomCode, name, emoji }) => {
+  if (roomCode === currentRoomCode) showRoomReaction(name, emoji);
 });
 
 socket.on("videoSync", ({ roomCode, time, paused, type }) => {

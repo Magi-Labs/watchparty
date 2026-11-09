@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Huddle",
   "description": "Watch videos together in sync and chat with everyone in your room.",
-  "version": "1.2.0",
+  "version": "1.2.4",
   "action": {},
   "background": {
     "service_worker": "background.js"
@@ -23,6 +23,7 @@
         "scripts/utils.js",
         "scripts/toast.js",
         "scripts/theme.js",
+        "scripts/emoji.js",
         "scripts/video-sync.js",
         "scripts/twitch.js",
         "scripts/socket.js",

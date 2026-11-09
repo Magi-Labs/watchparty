@@ -12,7 +12,7 @@
    2. Design Tokens (:root)
    =========================================== */
 :root {
-  --huddle-panel-width: min(340px, 65vw);
+  --huddle-panel-width: min(var(--huddle-preferred-width, 340px), 720px, 65vw);
   --hud-primary: #8b5cf6;
   --hud-primary-light: #a78bfa;
   --hud-secondary: #06b6d4;
@@ -43,6 +43,7 @@
    3. Base Container (sidebar)
    =========================================== */
 .huddle-sidebar {
+  --hud-bg-cream: var(--hud-platform-bg, #fff8f0);
   position: fixed;
   display: flex;
   flex-direction: column;
@@ -63,12 +64,65 @@
   overflow-x: hidden;
 }
 
+.huddle-sidebar.huddle-dark {
+  color-scheme: dark;
+  --hud-bg-cream: #151820;
+  --hud-bg-card: #232938;
+  --hud-text-dark: #f1f4fa;
+  --hud-text-muted: #b2bfd5;
+  --hud-border: #536078;
+  --hud-shadow: 4px 4px 0 #090b10;
+  --hud-shadow-sm: 2px 2px 0 #090b10;
+  --hud-shadow-hover: 6px 6px 0 #090b10;
+}
+
+.huddle-dark .huddle-header {
+  background: color-mix(in srgb, var(--hud-primary) 48%, var(--hud-bg-card)) !important;
+}
+
+.huddle-dark .huddle-btn-primary {
+  background: color-mix(in srgb, var(--hud-primary) 65%, var(--hud-bg-card));
+}
+
+.huddle-dark .huddle-btn-primary:hover {
+  background: color-mix(in srgb, var(--hud-primary-light) 45%, var(--hud-bg-card));
+}
+
 .huddle-sidebar.huddle-visible {
   transform: translateX(0); /* Bring on-screen when toggled */
 }
 
 .huddle-sidebar.huddle-fullscreen-hide {
   display: none !important;
+}
+
+.huddle-resize-handle {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 11;
+  width: 8px;
+  cursor: ew-resize;
+  touch-action: none;
+  visibility: hidden;
+}
+
+.huddle-visible > .huddle-resize-handle {
+  visibility: visible;
+}
+
+.huddle-resize-handle:is(:hover, :focus-visible),
+.huddle-resizing .huddle-resize-handle {
+  background: var(--hud-primary-light);
+  outline: none;
+}
+
+.huddle-resizing {
+  cursor: ew-resize !important;
+  user-select: none !important;
+}
+
+.huddle-resizing .huddle-open-btn {
+  transition: none;
 }
 
 :root:has(> .huddle-sidebar.huddle-docked.huddle-visible:not(.huddle-fullscreen-hide)) > body {
@@ -82,11 +136,11 @@
   max-width: calc(100vw - var(--huddle-panel-width)) !important;
 }
 
-.huddle-dock-btn {
+.huddle-dock-btn,
+.huddle-theme-btn {
   flex: none;
-  margin-right: 32px;
   padding: 5px 8px;
-  border: 1px solid currentColor;
+  border: 0;
   border-radius: 6px;
   background: transparent;
   color: inherit;
@@ -94,9 +148,54 @@
   cursor: pointer;
 }
 
-.huddle-dock-btn[aria-pressed="true"] {
+.huddle-dock-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-right: 32px;
+  padding: 4px 6px;
+  color: #fff;
+}
+
+.huddle-dark .huddle-dock-btn {
+  color: #b8d5ff;
+}
+
+.huddle-dock-btn[aria-pressed="true"] svg rect {
+  fill: currentColor;
+  fill-opacity: .22;
+}
+
+.huddle-dock-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  inset: calc(100% + 5px) auto auto 50%;
+  z-index: 1;
+  padding: 4px 7px;
+  border-radius: 5px;
   background: var(--hud-bg-card);
   color: var(--hud-text-dark);
+  font: 600 12px var(--hud-font);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  visibility: hidden;
+}
+
+.huddle-dock-btn:is(:hover, :focus-visible)::after {
+  visibility: visible;
+}
+
+.huddle-theme-btn {
+  margin-right: 6px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .huddle-header .huddle-logo-text {
+    display: none !important;
+  }
 }
 
 /* ===========================================
@@ -196,7 +295,7 @@
   justify-content: center !important;
   border-radius: var(--hud-radius-sm) !important;
   background: rgba(255, 255, 255, 0.2) !important;
-  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  border: 0 !important;
   color: var(--hud-text-light) !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -286,6 +385,13 @@
   width: auto;
 }
 
+#huddle-copy-invite,
+#huddle-reactions-button,
+#huddle-emoji-button {
+  border: 0;
+  box-shadow: none;
+}
+
 #huddle-room-chat {
   display: flex;
   flex: 1;
@@ -312,9 +418,68 @@
   color: var(--hud-text-muted);
 }
 
+.huddle-chat-message-header,
+.huddle-emoji-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.huddle-reply-button {
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--hud-text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.huddle-reply-button:hover,
+.huddle-emoji-option:hover {
+  background: color-mix(in srgb, var(--hud-primary) 18%, var(--hud-bg-card));
+}
+
+.huddle-reply-quote {
+  min-width: 0;
+  margin: 4px 0;
+  padding: 4px 7px;
+  border-inline-start: 3px solid var(--hud-primary-light);
+  background: color-mix(in srgb, var(--hud-primary) 8%, var(--hud-bg-cream));
+  color: var(--hud-text-muted);
+  font-size: 12px;
+}
+
+.huddle-reply-quote span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#huddle-reply-preview:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#huddle-reply-preview .huddle-reply-quote {
+  flex: 1;
+}
+
 .huddle-chat-own {
   align-self: flex-end;
   background: color-mix(in srgb, var(--hud-primary) 18%, var(--hud-bg-card));
+}
+
+.huddle-chat-activity {
+  align-self: center;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--hud-text-muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 .huddle-chat-empty {
@@ -334,6 +499,101 @@
 
 #huddle-room-chat-form button {
   width: auto;
+  flex-shrink: 0;
+}
+
+.huddle-emoji-grid:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
+  gap: 3px;
+}
+
+.huddle-emoji-option {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 19px;
+  cursor: pointer;
+}
+
+#huddle-emoji-picker {
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 24px));
+  padding: 14px;
+  border: 1px solid var(--hud-border);
+  border-radius: var(--hud-radius-sm);
+  background: var(--hud-bg-card);
+  color: var(--hud-text-dark);
+}
+
+#huddle-emoji-picker::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+#huddle-emoji-search {
+  margin: 8px 0;
+}
+
+#huddle-emoji-results {
+  max-height: min(310px, 45vh);
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+#huddle-emoji-results h3 {
+  margin: 8px 0 4px;
+  color: var(--hud-text-muted);
+  font-size: 12px;
+}
+
+#huddle-reaction-overlay {
+  position: fixed;
+  inset: auto auto 14vh 50%;
+  z-index: 100001;
+  display: flex;
+  gap: 6px;
+  max-width: 80vw;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+:root:has(> .huddle-sidebar.huddle-docked.huddle-visible:not(.huddle-fullscreen-hide)) #huddle-reaction-overlay {
+  left: calc((100vw - var(--huddle-panel-width)) / 2);
+}
+
+.huddle-reaction-burst {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px 9px;
+  border-radius: 10px;
+  background: rgb(18 22 32 / 85%);
+  color: #fff;
+  font: 600 13px var(--hud-font);
+  animation: huddle-float-reaction 2.4s ease-out both;
+}
+
+.huddle-reaction-burst span {
+  font-size: 27px;
+}
+
+.huddle-reaction-burst small {
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes huddle-float-reaction {
+  0% { opacity: 0; transform: translateY(12px) scale(.8); }
+  12%, 72% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-45px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .huddle-reaction-burst { animation: none; }
 }
 
 .huddle-card:hover {
@@ -720,13 +980,11 @@
   z-index: 99998;
   background: var(--hud-primary);
   color: var(--hud-text-light);
-  border: var(--hud-border-width) solid var(--hud-border);
-  border-right: none;
+  border: 0;
   border-radius: var(--hud-radius) 0 0 var(--hud-radius);
   padding: 12px 8px 12px 12px;
   font-size: 20px;
   cursor: pointer;
-  box-shadow: -4px 4px 0px var(--hud-border);
   transition:
     transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
     background var(--hud-transition),
@@ -744,7 +1002,6 @@
 
 .huddle-open-btn.sidebar-open {
   transform: translateY(-50%) translateX(calc(-1 * var(--huddle-panel-width)));
-  box-shadow: -2px 2px 0px var(--hud-border);
 }
 
 .huddle-open-btn.huddle-fullscreen-hide {
