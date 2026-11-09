@@ -2,10 +2,17 @@
 
 /* ---------- Socket Connection ---------- */
 const socket = io(HUDDLE_CONFIG.syncServerUrl, {
+  auth: { accessKey: HUDDLE_CONFIG.accessKey },
   reconnection: true,
   reconnectionAttempts: 10,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
+});
+
+socket.on("connect_error", (error) => {
+  if (error.message === "Invalid watch party access key") {
+    showToast("Install the configured private Watch Party extension.", "error");
+  }
 });
 
 /* ---------- Socket: Connection Events ---------- */

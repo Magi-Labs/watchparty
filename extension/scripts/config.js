@@ -6,7 +6,8 @@
 
 /* ---------- Configuration ---------- */
 const HUDDLE_CONFIG = {
-  syncServerUrl: "https://huddle-productions.up.railway.app", // Railway Production URL
+  syncServerUrl: "https://watchparty.deepaksilaych.me",
+  accessKey: "", // Filled when packaging the private extension.
   twitchClientId: "", // TODO: Set your Twitch Client ID
   twitchRedirectUri: "", // TODO: Set your Vercel OAuth redirect URL
   heartbeatInterval: 1000, // 1 second (faster sync)

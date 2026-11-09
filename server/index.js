@@ -5,6 +5,7 @@
 
 const express = require("express");
 const http = require("http");
+const { timingSafeEqual } = require("node:crypto");
 
 const app = express();
 const server = http.createServer(app);
@@ -16,6 +17,22 @@ const io = require("socket.io")(server, {
 });
 
 const PORT = process.env.PORT || 4000;
+const accessKey = Buffer.from(process.env.WATCHPARTY_ACCESS_KEY || "");
+
+if (process.env.NODE_ENV === "production" && accessKey.length === 0) {
+  throw new Error("WATCHPARTY_ACCESS_KEY is required in production");
+}
+
+io.use(function (socket, next) {
+  if (accessKey.length === 0) return next();
+
+  const candidate = socket.handshake.auth?.accessKey;
+  const supplied = Buffer.from(typeof candidate === "string" ? candidate : "");
+  if (supplied.length !== accessKey.length || !timingSafeEqual(supplied, accessKey)) {
+    return next(new Error("Invalid watch party access key"));
+  }
+  next();
+});
 
 // ============================================================================
 // Room Registry
@@ -118,6 +135,9 @@ app.get("/", function (req, res) {
  * Used by the Landing Page to look up a room before joining.
  */
 app.get("/api/room/:code", function (req, res) {
+  // The private deployment uses the extension for room discovery.
+  if (accessKey.length > 0) return res.sendStatus(404);
+
   var code = req.params.code.toUpperCase();
   var room = rooms.get(code);
 

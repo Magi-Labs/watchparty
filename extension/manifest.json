@@ -9,7 +9,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://www.netflix.com/*",
+        "https://*.hotstar.com/*",
+        "https://www.primevideo.com/*",
+        "https://clips.twitch.tv/*"
+      ],
       "js": [
         "vendor/socket.io.min.js",
         "scripts/config.js",
