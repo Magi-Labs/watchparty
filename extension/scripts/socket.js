@@ -59,6 +59,10 @@ socket.on("joinSuccess", (room) => {
 
 socket.on("joinError", ({ roomCode, message }) => {
   if (roomCode === currentRoomCode) exitRoom();
+  if (roomCode && !currentRoomCode) {
+    document.getElementById("huddle-room-input").value = roomCode;
+    openSidebar();
+  }
   showToast(message, "error");
 });
 

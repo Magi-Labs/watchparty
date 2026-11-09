@@ -38,7 +38,7 @@ function renderMainView() {
 
     <div class="huddle-divider" style="margin: 16px 0;">settings</div>
     <div class="huddle-card" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;">
-      <span style="font-size: 13px; font-weight: 600; color: var(--hud-text-muted);">Show floating 🎬 button</span>
+      <span style="font-size: 13px; font-weight: 600; color: var(--hud-text-muted);">Show floating tab</span>
       <label class="huddle-switch">
         <input type="checkbox" id="huddle-toggle-floating" ${showFloating ? "checked" : ""}>
         <span class="huddle-switch-slider"></span>
@@ -95,12 +95,18 @@ function renderRoomView() {
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       </button>
-      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-reactions-button"
-        type="button" aria-label="Quick reactions" title="Quick reactions"
-        aria-controls="huddle-reactions" aria-expanded="false">🎉</button>
-      <button class="huddle-btn huddle-btn-small" id="huddle-leave-room-btn" type="button">Leave</button>
+      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-leave-room-btn"
+        type="button" aria-label="Leave room" title="Leave room">
+        <!-- Lucide log-out icon. See vendor/LUCIDE-LICENSE.txt. -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m16 17 5-5-5-5" />
+          <path d="M21 12H9" />
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        </svg>
+      </button>
     </div>
-    <div class="huddle-emoji-grid" id="huddle-reactions" role="group" aria-label="Quick reactions" hidden></div>
+    <div class="huddle-emoji-grid" id="huddle-reactions" role="group" aria-label="Quick reactions"></div>
     <input class="huddle-input" id="huddle-invite-url" aria-label="Invite link" readonly hidden>
     <div id="huddle-room-chat" role="log" aria-label="Room chat"></div>
     <div id="huddle-reply-preview" hidden>
@@ -112,7 +118,15 @@ function renderRoomView() {
         type="button" aria-label="Choose emoji" title="Choose emoji" aria-haspopup="dialog">☺</button>
       <input class="huddle-input" id="huddle-room-chat-input" aria-label="Chat message"
         placeholder="Type a message" maxlength="300" required>
-      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" type="submit">Send</button>
+      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-chat-send"
+        type="submit" aria-label="Send" title="Send message">
+        <!-- Lucide send icon. See vendor/LUCIDE-LICENSE.txt. -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
+          <path d="m21.854 2.147-10.94 10.939" />
+        </svg>
+      </button>
     </form>
     <dialog id="huddle-emoji-picker" aria-labelledby="huddle-emoji-title">
       <div class="huddle-emoji-header">
