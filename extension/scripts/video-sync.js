@@ -1,122 +1,76 @@
-/* === Huddle — Video Sync === */
+/* === Huddle — Shared Playback === */
 
-/* ---------- Video Player Detection ---------- */
+const observedPlayers = new WeakSet();
+let roomPlayback = null;
+let videoCheckTimer = null;
+let playbackPending = false;
+
+function playbackTime() {
+  const elapsed = roomPlayback.paused ? 0 : (performance.now() - roomPlayback.receivedAt) / 1000;
+  return roomPlayback.time + elapsed;
+}
+
+function syncPlayer(threshold) {
+  if (!videoPlayer || isAdPlaying() || videoPlayer.readyState === 0) return;
+  if (!areUrlsSameVideo(window.location.href, roomVideoUrl)) return;
+  playbackPending = false;
+  const time = Math.min(playbackTime(), videoPlayer.duration || Infinity);
+  if (!videoPlayer.seeking && Math.abs(videoPlayer.currentTime - time) > threshold) {
+    videoPlayer.currentTime = time;
+  }
+  if (roomPlayback.paused && !videoPlayer.paused) videoPlayer.pause();
+  if (!roomPlayback.paused && videoPlayer.paused) videoPlayer.play().catch(() => {});
+}
+
+function receivePlayback({ time, paused }, type) {
+  if (!Number.isFinite(time) || typeof paused !== "boolean") return;
+  roomPlayback = { time, paused, receivedAt: performance.now() };
+  playbackPending = true;
+  syncPlayer(type === "seek" || type === "initial" ? 0.4 : 2);
+}
+
+function emitVideoSync(video, type) {
+  if (video !== videoPlayer || !roomPlayback || !socket.connected || isAdPlaying()) return;
+  if (!areUrlsSameVideo(window.location.href, roomVideoUrl)) return;
+
+  const { currentTime: time, paused } = video;
+  // Ignore media events caused by applying the shared state to this player.
+  const echoed = type === "seek"
+    ? Math.abs(time - Math.min(playbackTime(), video.duration || Infinity)) <= 0.5
+    : paused === roomPlayback.paused;
+  if (echoed) return;
+
+  roomPlayback = { time, paused, receivedAt: performance.now() };
+  socket.emit("videoSync", { roomCode: currentRoomCode, time, paused, type });
+}
+
 function detectVideoPlayer() {
-  // Check for ads first (YouTube specific)
-  const adElement = document.querySelector(".ad-cta-wrapper");
-  if (adElement) {
-    adTimer = setTimeout(detectVideoPlayer, 500);
-    return;
-  }
-
-  const video = document.querySelector("video");
-  if (video) {
+  const onRoomVideo = areUrlsSameVideo(window.location.href, roomVideoUrl);
+  const video = onRoomVideo && !isAdPlaying() ? document.querySelector("video") : null;
+  if (video !== videoPlayer) {
     videoPlayer = video;
-    videoPlayer.removeAttribute("autoplay");
-    attachVideoListeners();
-    console.log("[Huddle] Video player detected");
-
-    // Apply pending initial sync if present (for joiners joining/restoring)
-    if (!isHost && pendingInitialSync) {
-      const { hostTime, isHostPaused } = pendingInitialSync;
-      if (isHostPaused) {
-        videoPlayer.pause();
-      }
-      videoPlayer.currentTime = hostTime;
-      if (!isHostPaused) {
-        videoPlayer.play().catch(() => {});
-      }
-      pendingInitialSync = null; // Clear it
+    playbackPending = true;
+    if (video && !observedPlayers.has(video)) {
+      observedPlayers.add(video);
+      video.addEventListener("play", () => emitVideoSync(video, "play"));
+      video.addEventListener("pause", () => emitVideoSync(video, "pause"));
+      video.addEventListener("seeked", () => emitVideoSync(video, "seek"));
     }
-  } else {
-    adTimer = setTimeout(detectVideoPlayer, 500);
   }
+  if (playbackPending) syncPlayer(0.4);
 }
 
-function attachVideoListeners() {
-  if (!videoPlayer || !isHost) return;
-
-  // Prevent duplicate listeners on the reused video element
-  if (videoPlayer.huddleListenersAttached) return;
-  videoPlayer.huddleListenersAttached = true;
-
-  videoPlayer.addEventListener("play", () => {
-    emitVideoSync("play");
-  });
-
-  videoPlayer.addEventListener("pause", () => {
-    emitVideoSync("pause");
-  });
-
-  videoPlayer.addEventListener("seeked", () => {
-    emitVideoSync("seek");
-  });
-}
-
-function emitVideoSync(type) {
-  if (!isHost || !videoPlayer || !currentRoomCode) return;
-
-  // Do not emit sync events if Host is currently watching an ad
-  if (isAdPlaying()) return;
-
-  const state = {
-    hostTime: videoPlayer.currentTime,
-    isHostPaused: videoPlayer.paused,
-    type: type,
-  };
-
-  socket.emit("videoSync", state);
-  lastSyncedState = { time: state.hostTime, paused: state.isHostPaused };
-}
-
-function startVideoSync() {
+function startVideoSync(playback) {
+  stopVideoSync();
+  receivePlayback(playback, "initial");
   detectVideoPlayer();
-
-  // Clear any existing heartbeat timer first to prevent duplicate loops
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
-
-  // Heartbeat for drift correction (host only)
-  if (isHost) {
-    lastSyncedVideoUrl = getVideoMetadata().videoUrl;
-    heartbeatTimer = setInterval(() => {
-      // Do not sync if Host is currently watching an ad
-      if (isAdPlaying()) return;
-
-      // 1. Detect if Host navigated to a new video/URL
-      const meta = getVideoMetadata();
-      if (meta.videoUrl !== lastSyncedVideoUrl) {
-        lastSyncedVideoUrl = meta.videoUrl;
-        console.log("[Huddle] Host changed video. Sending room metadata update:", meta.videoUrl);
-
-        socket.emit("updateRoomMeta", {
-          roomCode: currentRoomCode,
-          videoUrl: meta.videoUrl,
-          videoTitle: meta.videoTitle,
-          videoThumbnail: meta.videoThumbnail,
-          source: meta.source,
-          videoDuration: meta.videoDuration
-        });
-
-        // Re-detect new player reference for the new video page
-        detectVideoPlayer();
-        return; // Skip heartbeat sync for this tick
-      }
-
-      emitVideoSync("heartbeat");
-    }, HUDDLE_CONFIG.heartbeatInterval);
-  }
+  videoCheckTimer = setInterval(detectVideoPlayer, 500);
 }
 
 function stopVideoSync() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
-  if (adTimer) {
-    clearTimeout(adTimer);
-    adTimer = null;
-  }
+  clearInterval(videoCheckTimer);
+  videoCheckTimer = null;
+  videoPlayer = null;
+  roomPlayback = null;
+  playbackPending = false;
 }

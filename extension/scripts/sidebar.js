@@ -38,6 +38,19 @@ function buildSidebar() {
     </div>
   `;
 
+  const dockBtn = document.createElement("button");
+  dockBtn.type = "button";
+  dockBtn.className = "huddle-dock-btn";
+  dockBtn.textContent = "Dock panel";
+  dockBtn.setAttribute("aria-pressed", localStorage.getItem("huddle_docked") === "true");
+  sidebar.classList.toggle("huddle-docked", dockBtn.getAttribute("aria-pressed") === "true");
+  dockBtn.addEventListener("click", () => {
+    const docked = sidebar.classList.toggle("huddle-docked");
+    dockBtn.setAttribute("aria-pressed", docked);
+    localStorage.setItem("huddle_docked", docked);
+  });
+  header.appendChild(dockBtn);
+
   const closeBtn = document.createElement("div");
   closeBtn.className = "huddle-close-btn";
   closeBtn.textContent = "✕";
@@ -112,8 +125,8 @@ function buildSidebar() {
   });
 
   // Append both to DOM together to avoid reflow between inserts
-  document.body.appendChild(sidebar);
-  document.body.appendChild(openBtn);
+  // Keep the panel outside the page area it resizes when docked.
+  document.documentElement.append(sidebar, openBtn);
 
   // Render initial view
   renderMainView();

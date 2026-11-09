@@ -17,12 +17,6 @@
       rel="stylesheet"
     />
 
-    <!-- Socket.io client -->
-    <script
-      src="https://cdn.socket.io/4.7.5/socket.io.min.js"
-      crossorigin="anonymous"
-    ></script>
-
     <style>
       /* ── Reset & Base ──────────────────────────────────────────────── */
       *,
@@ -437,10 +431,6 @@
           <div class="info__title" id="videoTitle">Loading video title…</div>
 
           <div class="info__row">
-            <span class="emoji">👤</span>
-            <span>Host: <strong id="hostName">—</strong></span>
-          </div>
-          <div class="info__row">
             <span class="emoji">🌐</span>
             <span>Source: <strong id="videoSource">—</strong></span>
           </div>
@@ -503,7 +493,6 @@
         // ── Config ──────────────────────────────────────────────────────
         // The Sync Server URL is injected via a meta tag or falls back to
         // the same origin (for Vercel rewrites) or can be hard-coded here.
-        var SYNC_SERVER_URL = getMeta("sync-server-url") || "";
         var CHROME_STORE_URL =
           "https://chromewebstore.google.com/detail/huddle";
 
@@ -515,7 +504,6 @@
         var $thumb = document.getElementById("thumbContainer");
         var $statusBadge = document.getElementById("statusBadge");
         var $videoTitle = document.getElementById("videoTitle");
-        var $hostName = document.getElementById("hostName");
         var $videoSource = document.getElementById("videoSource");
         var $currentTime = document.getElementById("currentTime");
         var $totalTime = document.getElementById("totalTime");
@@ -554,8 +542,9 @@
             })
             .then(function (data) {
               roomData = data;
-              renderRoom(data);
-              connectSocket();
+              if ($main.classList.contains("hidden")) renderRoom(data);
+              updatePlayback(data.time, !data.paused);
+              setTimeout(fetchRoomData, 5000);
             })
             .catch(function (err) {
               showError(err.message || "Could not load room data.");
@@ -582,32 +571,8 @@
 
           // Text info
           $videoTitle.textContent = data.videoTitle || "Untitled Video";
-          $hostName.textContent = data.hostName || "Anonymous";
           $videoSource.textContent = data.source || detectSource(data.videoUrl);
           $totalTime.textContent = formatTime(data.videoDuration || 0);
-          updatePlayback(data.hostTime || 0, !data.isHostPaused);
-        }
-
-        // ── Real-time Updates via Socket.io ─────────────────────────────
-        function connectSocket() {
-          if (typeof io === "undefined") return;
-
-          var serverUrl = SYNC_SERVER_URL || "http://localhost:4000"; // LOCAL TEST
-          var socket = io(serverUrl, { transports: ["websocket", "polling"] });
-
-          socket.on("connect", function () {
-            socket.emit("joinRoom", {
-              roomCode: roomCode,
-              name: "__landing__",
-            });
-          });
-
-          // Listen for video state updates from the host
-          socket.on("videoSync", function (state) {
-            if (state && typeof state === "object") {
-              updatePlayback(state.hostTime || 0, !state.isHostPaused);
-            }
-          });
         }
 
         // ── Update Playback Display ─────────────────────────────────────
@@ -724,11 +689,6 @@
           } catch (e) {
             return "Unknown";
           }
-        }
-
-        function getMeta(name) {
-          var el = document.querySelector('meta[name="' + name + '"]');
-          return el ? el.getAttribute("content") : "";
         }
 
         function showError(msg) {

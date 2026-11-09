@@ -12,6 +12,7 @@
    2. Design Tokens (:root)
    =========================================== */
 :root {
+  --huddle-panel-width: min(340px, 65vw);
   --hud-primary: #8b5cf6;
   --hud-primary-light: #a78bfa;
   --hud-secondary: #06b6d4;
@@ -48,7 +49,8 @@
   z-index: 99999;
   right: 0;
   top: 0;
-  width: 340px;
+  width: var(--huddle-panel-width);
+  box-sizing: border-box;
   height: 100vh;
   background: var(--hud-bg-cream);
   font-family: var(--hud-font);
@@ -67,6 +69,34 @@
 
 .huddle-sidebar.huddle-fullscreen-hide {
   display: none !important;
+}
+
+:root:has(> .huddle-sidebar.huddle-docked.huddle-visible:not(.huddle-fullscreen-hide)) > body {
+  width: calc(100% - var(--huddle-panel-width)) !important;
+  margin-inline-end: var(--huddle-panel-width) !important;
+  transform: translateZ(0);
+  overflow-x: clip;
+}
+
+:root:has(> .huddle-sidebar.huddle-docked.huddle-visible:not(.huddle-fullscreen-hide)) body :is(main, video) {
+  max-width: calc(100vw - var(--huddle-panel-width)) !important;
+}
+
+.huddle-dock-btn {
+  flex: none;
+  margin-right: 32px;
+  padding: 5px 8px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: 600 12px var(--hud-font);
+  cursor: pointer;
+}
+
+.huddle-dock-btn[aria-pressed="true"] {
+  background: var(--hud-bg-card);
+  color: var(--hud-text-dark);
 }
 
 /* ===========================================
@@ -236,7 +266,76 @@
   transition: all var(--hud-transition);
 }
 
-/* Keeping the first version's hover effect */
+#huddle-page-room.active {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: 12px;
+  padding: 12px;
+}
+
+.huddle-room-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.huddle-room-toolbar .huddle-btn {
+  width: auto;
+}
+
+#huddle-room-chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 8px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.huddle-chat-bubble {
+  align-self: flex-start;
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--hud-bg-card);
+  overflow-wrap: anywhere;
+}
+
+.huddle-chat-bubble strong {
+  display: block;
+  font-size: 11px;
+  color: var(--hud-text-muted);
+}
+
+.huddle-chat-own {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--hud-primary) 18%, var(--hud-bg-card));
+}
+
+.huddle-chat-empty {
+  margin: auto;
+  color: var(--hud-text-muted);
+}
+
+#huddle-room-chat-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#huddle-room-chat-form input {
+  min-width: 0;
+}
+
+#huddle-room-chat-form button {
+  width: auto;
+}
+
 .huddle-card:hover {
   box-shadow: var(--hud-shadow-hover);
   transform: translate(-1px, -1px);
@@ -644,7 +743,7 @@
 }
 
 .huddle-open-btn.sidebar-open {
-  transform: translateY(-50%) translateX(-340px);
+  transform: translateY(-50%) translateX(calc(-1 * var(--huddle-panel-width)));
   box-shadow: -2px 2px 0px var(--hud-border);
 }
 

@@ -2,38 +2,16 @@
 
 /* ---------- Auto-Join via URL Hash ---------- */
 function checkAutoJoin() {
-  const hash = window.location.hash;
-  const match = hash.match(/#huddle_room=([A-Z0-9-]+)/i);
-  if (match) {
-    const roomCode = match[1].toUpperCase();
+  const params = new URLSearchParams(window.location.hash.slice(1));
+  const roomCode = params.get("huddle_room")?.toUpperCase();
+  if (!/^HUD-[A-Z0-9]{4}$/.test(roomCode ?? "")) return false;
 
-    // Parse name if present
-    const nameMatch = hash.match(/name=([^&]+)/i);
-    let autoJoinName = null;
-    if (nameMatch) {
-      autoJoinName = decodeURIComponent(nameMatch[1]);
-      saveDisplayName(autoJoinName);
-    }
-
-    // Clean the hash so it doesn't persist
-    history.replaceState(
-      null,
-      "",
-      window.location.pathname + window.location.search,
-    );
-
-    // Wait for socket connection then join
-    const tryJoin = () => {
-      if (mySocketId) {
-        const savedName = autoJoinName || displayName || "Viewer";
-        displayName = savedName;
-        socket.emit("joinRoom", { roomCode, name: displayName });
-      } else {
-        setTimeout(tryJoin, 200);
-      }
-    };
-    tryJoin();
-  }
+  const name = params.get("name");
+  if (name) saveDisplayName(name);
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+  pendingInviteCode = roomCode;
+  if (socket.connected) rejoinRoom();
+  return true;
 }
 
 /* ---------- Extension Detection Marker ---------- */
@@ -69,30 +47,8 @@ function init() {
   loadDisplayName(() => {
     restoreRoomSession(() => {
       buildSidebar();
-      checkAutoJoin();
-
-      // Listen for client-side SPA routing hash changes
+      if (!checkAutoJoin() && socket.connected) rejoinRoom();
       window.addEventListener("hashchange", checkAutoJoin);
-
-      // Reconnect/Reclaim room automatically if session is restored
-      if (currentRoomCode) {
-        const tryReclaimOrJoin = () => {
-          if (mySocketId) {
-            const savedName = displayName || "Viewer";
-            displayName = savedName;
-            if (isHost) {
-              console.log("[Huddle] Restored Host session. Reclaiming room:", currentRoomCode);
-              socket.emit("reclaimRoom", { roomCode: currentRoomCode, hostName: displayName });
-            } else {
-              console.log("[Huddle] Restored Guest session. Joining room:", currentRoomCode);
-              socket.emit("joinRoom", { roomCode: currentRoomCode, name: displayName });
-            }
-          } else {
-            setTimeout(tryReclaimOrJoin, 200);
-          }
-        };
-        tryReclaimOrJoin();
-      }
     });
   });
 }

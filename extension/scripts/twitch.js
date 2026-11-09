@@ -96,50 +96,6 @@ async function checkTwitchLiveStatus() {
   }
 }
 
-async function shareToTwitchChat() {
-  if (!twitchAccessToken || !twitchUserInfo || !currentRoomCode) return;
-  if (!twitchLiveStatus) {
-    showToast("You must be live on Twitch to share!", "error");
-    return;
-  }
-
-  const messageInput = document.getElementById("huddle-twitch-message");
-  const customMessage = messageInput
-    ? messageInput.value
-    : "Come watch with me!";
-  const meta = getVideoMetadata();
-
-  // Compose message: custom text + video URL + room URL
-  const roomUrl = `${HUDDLE_CONFIG.twitchRedirectUri.replace("/api/twitch/oauth", "")}/room/${currentRoomCode}`;
-  const fullMessage = `${customMessage} 🎬 ${meta.videoUrl} 🔗 ${roomUrl}`;
-
-  try {
-    const res = await fetch("https://api.twitch.tv/helix/chat/messages", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${twitchAccessToken}`,
-        "Client-Id": HUDDLE_CONFIG.twitchClientId,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        broadcaster_id: twitchUserInfo.id,
-        sender_id: twitchUserInfo.id,
-        message: fullMessage,
-      }),
-    });
-
-    if (res.ok) {
-      showToast("Shared to Twitch Chat! ✨", "success");
-    } else {
-      const err = await res.json();
-      showToast(`Failed: ${err.message || "Unknown error"}`, "error");
-    }
-  } catch (err) {
-    console.error("[Huddle] Share to chat error:", err);
-    showToast("Failed to send chat message.", "error");
-  }
-}
-
 /* ---------- Restore Twitch Token on Load ---------- */
 function restoreTwitchToken() {
   try {

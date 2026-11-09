@@ -2,21 +2,14 @@
 
 /* ---------- State ---------- */
 let videoPlayer = null;
-let adTimer = null;
 let mySocketId = null;
 let currentRoomCode = null;
-let currentHostVideoUrl = null;
-let currentHostName = "";
-let isHost = false;
+let roomVideoUrl = null;
+let pendingInviteCode = null;
 let displayName = "";
-let viewersInRoom = [];
-let viewersExpanded = true;
+const roomChatMessages = [];
 let isConnectedToTwitch = false;
 let twitchAccessToken = null;
 let twitchUserInfo = null;
 let twitchLiveStatus = null;
 let currentPage = "main"; // 'main' | 'twitch' | 'room'
-let heartbeatTimer = null;
-let lastSyncedState = { time: 0, paused: true };
-let lastSyncedVideoUrl = "";
-let pendingInitialSync = null;

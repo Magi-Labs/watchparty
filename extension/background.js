@@ -13,7 +13,7 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-// Manage tab-specific session storage to prevent hosts/joiners conflicts across tabs
+// Manage tab-specific session storage to prevent rooms conflicts across tabs
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab && sender.tab.id;
   if (!tabId) return;
@@ -24,8 +24,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (chrome.storage && chrome.storage.session) {
       chrome.storage.session.set({
         [key]: {
-          roomCode: message.roomCode,
-          isHost: message.isHost
+          roomCode: message.roomCode
         }
       }, () => {
         sendResponse({ success: true });
@@ -40,11 +39,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "HUDDLE_GET_SESSION") {
     if (chrome.storage && chrome.storage.session) {
       chrome.storage.session.get(key, (result) => {
-        const session = result[key] || { roomCode: null, isHost: false };
+        const session = result[key] || { roomCode: null };
         sendResponse(session);
       });
     } else {
-      sendResponse({ roomCode: null, isHost: false });
+      sendResponse({ roomCode: null });
     }
     return true; // Keep response channel open
   }

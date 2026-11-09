@@ -13,7 +13,7 @@ function renderMainView() {
     <div class="huddle-card">
       <div class="huddle-card-title">👤 Display Name</div>
       <input class="huddle-input" id="huddle-name-input" type="text" 
-             placeholder="What should we call you?" value="${savedName}" />
+             placeholder="What should we call you?" maxlength="80" />
     </div>
 
     <button class="huddle-btn huddle-btn-primary" id="huddle-create-room-btn" style="margin-top: 16px;">
@@ -45,6 +45,8 @@ function renderMainView() {
       </label>
     </div>
   `;
+
+  document.getElementById("huddle-name-input").value = savedName;
 
   // Event listeners
   document
@@ -81,157 +83,83 @@ function renderRoomView() {
   const page = document.getElementById("huddle-page-room");
   if (!page) return;
 
-  let isOnHostVideo = true;
-  if (currentHostVideoUrl) {
-    try {
-      const currentUrl = new URL(window.location.href);
-      const targetUrl = new URL(currentHostVideoUrl);
-      if (
-        currentUrl.hostname.includes("youtube.com") &&
-        targetUrl.hostname.includes("youtube.com")
-      ) {
-        isOnHostVideo =
-          currentUrl.searchParams.get("v") === targetUrl.searchParams.get("v");
-      } else {
-        isOnHostVideo =
-          currentUrl.origin + currentUrl.pathname ===
-          targetUrl.origin + targetUrl.pathname;
-      }
-    } catch (e) {}
-  }
-
   page.innerHTML = `
-    <div class="huddle-room-code" id="huddle-room-code-display" title="Click to copy">
-      ${currentRoomCode}
+    <div class="huddle-room-toolbar">
+      <strong id="huddle-room-code-display"></strong>
+      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-copy-invite" type="button">Copy invite</button>
+      <button class="huddle-btn huddle-btn-small" id="huddle-leave-room-btn" type="button">Leave</button>
     </div>
-    <div class="huddle-room-code-hint">Click to copy • Share this code!</div>
-
-    ${
-      !isHost && currentHostVideoUrl && !isOnHostVideo
-        ? `
-      <button class="huddle-btn huddle-btn-twitch" id="huddle-open-host-video-btn" style="background: var(--hud-primary); margin-bottom: 15px;">
-        📺 Open Host's Video
-      </button>
-    `
-        : ""
-    }
-
-    <div class="huddle-card" style="padding: 12px 16px;">
-      <div class="huddle-card-title" id="huddle-viewers-toggle" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-        <span>👥 Viewers (${viewersInRoom.length + 1})</span>
-        <span id="huddle-viewers-arrow" style="font-size: 10px; transition: transform var(--hud-transition); transform: ${viewersExpanded ? "rotate(90deg)" : "rotate(0deg)"};">▶</span>
-      </div>
-      <div class="huddle-viewers-list" id="huddle-viewers-list" style="display: ${viewersExpanded ? "flex" : "none"}; margin-top: 10px;">
-      </div>
-    </div>
-
-    ${
-      isHost
-        ? `
-      <button class="huddle-btn huddle-btn-twitch" id="huddle-room-twitch-btn">
-        🟣 Share on Twitch
-      </button>
-    `
-        : ""
-    }
-
-    <button class="huddle-btn huddle-btn-accent" id="huddle-leave-room-btn">
-      ${isHost ? "🔴 Close Room" : "🚪 Leave Room"}
-    </button>
+    <div id="huddle-room-chat" role="log" aria-label="Room chat"></div>
+    <form id="huddle-room-chat-form">
+      <input class="huddle-input" id="huddle-room-chat-input" aria-label="Chat message"
+        placeholder="Type a message" maxlength="300" required>
+      <button class="huddle-btn huddle-btn-secondary huddle-btn-small" type="submit">Send</button>
+    </form>
   `;
 
-  renderViewersList();
+  document.getElementById("huddle-room-code-display").textContent = currentRoomCode;
+  document.getElementById("huddle-copy-invite").addEventListener("click", async () => {
+    const invite = new URL(roomVideoUrl);
+    invite.hash = new URLSearchParams({ huddle_room: currentRoomCode }).toString();
+    try {
+      await navigator.clipboard.writeText(invite.href);
+      showToast("Invite link copied!");
+    } catch {
+      showToast("Could not copy the invite. Share the room code instead.", "error");
+    }
+  });
+  document.getElementById("huddle-leave-room-btn").addEventListener("click", handleLeaveRoom);
+  renderRoomChat();
 
-  // Viewers list toggle expand/collapse
-  const viewersToggle = document.getElementById("huddle-viewers-toggle");
-  if (viewersToggle) {
-    viewersToggle.addEventListener("click", () => {
-      viewersExpanded = !viewersExpanded;
-      const list = document.getElementById("huddle-viewers-list");
-      const arrow = document.getElementById("huddle-viewers-arrow");
-      if (list) list.style.display = viewersExpanded ? "flex" : "none";
-      if (arrow)
-        arrow.style.transform = viewersExpanded
-          ? "rotate(90deg)"
-          : "rotate(0deg)";
-    });
-  }
+  const chatForm = document.getElementById("huddle-room-chat-form");
+  const chatInput = document.getElementById("huddle-room-chat-input");
+  const chatSend = chatForm.querySelector("button");
+  chatInput.addEventListener("keydown", (event) => event.stopPropagation());
+  chatForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const message = chatInput.value.trim();
+    if (!message || chatSend.disabled) return;
+    if (!socket.connected) {
+      showToast("Reconnect to the room before sending a message.", "warning");
+      return;
+    }
 
-  // Copy room code
-  document
-    .getElementById("huddle-room-code-display")
-    .addEventListener("click", () => {
-      navigator.clipboard.writeText(currentRoomCode).then(() => {
-        showToast("Room code copied!");
-      });
-    });
-
-  // Open host video
-  const openHostBtn = document.getElementById("huddle-open-host-video-btn");
-  if (openHostBtn) {
-    openHostBtn.addEventListener("click", () => {
-      try {
-        const targetUrl = new URL(currentHostVideoUrl);
-        targetUrl.hash = `huddle_room=${currentRoomCode}&name=${encodeURIComponent(displayName)}`;
-        window.open(targetUrl.toString(), "_blank");
-        // Leave room in current tab to prevent duplicates
-        handleLeaveRoom();
-      } catch (e) {
-        console.error("Invalid host URL", e);
+    chatSend.disabled = true;
+    const draft = chatInput.value;
+    socket.timeout(5000).emit("roomChat", { roomCode: currentRoomCode, message }, (error, sent) => {
+      chatSend.disabled = false;
+      if (error || !sent) {
+        showToast("Chat message could not be confirmed.", "error");
+        return;
       }
+      if (chatInput.value === draft) chatInput.value = "";
     });
-  }
-
-  // Leave/close room
-  document
-    .getElementById("huddle-leave-room-btn")
-    .addEventListener("click", handleLeaveRoom);
-
-  // Twitch share button (host only)
-  const twitchBtn = document.getElementById("huddle-room-twitch-btn");
-  if (twitchBtn) {
-    twitchBtn.addEventListener("click", () => {
-      showPage("twitch");
-      renderTwitchView();
-    });
-  }
-}
-
-function renderViewersList() {
-  const list = document.getElementById("huddle-viewers-list");
-  if (!list) return;
-
-  // 1. Host item is always at the top!
-  const hostIsMe = isHost || displayName === currentHostName;
-  let html = `
-    <div class="huddle-viewer-item host" title="Room Host">
-      <span class="huddle-viewer-dot" style="background: var(--hud-primary);"></span>
-      <strong>${currentHostName || "Host"}</strong> ${hostIsMe ? '<small style="color: var(--hud-text-muted); font-weight:normal;">(You)</small>' : ""}
-      <span style="margin-left: auto;">👑</span>
-    </div>
-  `;
-
-  // 2. Render other viewers
-  viewersInRoom.forEach((name) => {
-    // Skip host in the viewers loop to prevent duplicate display
-    if (name === currentHostName) return;
-
-    const isMe = name === displayName;
-    html += `
-      <div class="huddle-viewer-item ${isMe ? "me" : ""}">
-        <span class="huddle-viewer-dot" style="background: ${isMe ? "var(--hud-secondary)" : "var(--hud-success)"};"></span>
-        <span>${name} ${isMe ? '<small style="color: var(--hud-text-muted); font-weight:normal;">(You)</small>' : ""}</span>
-      </div>
-    `;
   });
 
-  list.innerHTML = html;
+}
 
-  // Update counter inside the header span
-  const counterSpan = document.querySelector("#huddle-viewers-toggle span");
-  if (counterSpan) {
-    counterSpan.textContent = `👥 Viewers (${viewersInRoom.length + 1})`;
+function renderRoomChat() {
+  const chat = document.getElementById("huddle-room-chat");
+  if (!chat) return;
+
+  const messages = roomChatMessages.map(({ name, message, own }) => {
+    const bubble = document.createElement("div");
+    bubble.className = own ? "huddle-chat-bubble huddle-chat-own" : "huddle-chat-bubble";
+    const sender = document.createElement("strong");
+    sender.textContent = name;
+    const body = document.createElement("div");
+    body.textContent = message;
+    bubble.append(sender, body);
+    return bubble;
+  });
+  if (messages.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "huddle-chat-empty";
+    empty.textContent = "No messages yet.";
+    messages.push(empty);
   }
+  chat.replaceChildren(...messages);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 /* ---------- UI: Twitch Page ---------- */
@@ -292,30 +220,6 @@ function renderTwitchView() {
       </button>
     `;
 
-    // Share to chat section (only if in a room)
-    if (currentRoomCode && isHost) {
-      html += `
-        <div class="huddle-divider">share to chat</div>
-        <div class="huddle-card">
-          <div class="huddle-card-title">💬 Custom Message</div>
-          <textarea class="huddle-textarea" id="huddle-twitch-message" 
-                    placeholder="Come watch with me! 🎬">${localStorage.getItem("huddle_twitch_msg") || "Come watch with me! 🎬"}</textarea>
-        </div>
-        <button class="huddle-btn huddle-btn-accent" id="huddle-twitch-share" 
-                ${!twitchLiveStatus ? "disabled" : ""}>
-          📤 Share to Twitch Chat
-        </button>
-        ${!twitchLiveStatus ? '<div class="huddle-room-code-hint">⚠️ You must be live to share</div>' : ""}
-      `;
-    } else if (!currentRoomCode) {
-      html += `
-        <div class="huddle-empty">
-          <span class="huddle-empty-icon">🏠</span>
-          <span class="huddle-empty-text">Create a room first to share on Twitch</span>
-        </div>
-      `;
-    }
-
     // Disconnect button
     html += `
       <button class="huddle-btn huddle-btn-secondary huddle-btn-small" id="huddle-twitch-disconnect" style="margin-top: 8px;">
@@ -341,14 +245,6 @@ function renderTwitchView() {
   document
     .getElementById("huddle-twitch-refresh")
     ?.addEventListener("click", checkTwitchLiveStatus);
-
-  document
-    .getElementById("huddle-twitch-share")
-    ?.addEventListener("click", () => {
-      const msgInput = document.getElementById("huddle-twitch-message");
-      if (msgInput) localStorage.setItem("huddle_twitch_msg", msgInput.value);
-      shareToTwitchChat();
-    });
 
   document
     .getElementById("huddle-twitch-disconnect")
@@ -380,7 +276,7 @@ function handleCreateRoom() {
   const meta = getVideoMetadata();
   if (meta.source === "unknown") {
     showToast(
-      "You can only Host a room on a supported video page (e.g. a YouTube video)!",
+      "Open a video on a supported streaming site to start a room.",
       "error",
     );
     return;
@@ -400,7 +296,7 @@ function handleCreateRoom() {
 
   if (!isValidVideoPage) {
     showToast(
-      "Please navigate to an actual video page before hosting!",
+      "Open a video before starting a room.",
       "error",
     );
     return;
@@ -409,15 +305,16 @@ function handleCreateRoom() {
   displayName = nameInput.value.trim();
   saveDisplayName(displayName);
 
+  const video = isAdPlaying() ? null : document.querySelector("video");
   socket.emit("createRoom", {
-    hostName: displayName,
+    name: displayName,
     videoUrl: meta.videoUrl,
     videoTitle: meta.videoTitle,
     videoThumbnail: meta.videoThumbnail,
+    videoDuration: video?.duration ?? 0,
     source: meta.source,
-    videoDuration: meta.videoDuration,
-    isTwitchRoom: isConnectedToTwitch,
-    twitchChannel: twitchUserInfo?.login || "",
+    time: video?.currentTime ?? 0,
+    paused: video?.paused ?? true,
   });
 }
 
@@ -441,18 +338,16 @@ function handleJoinRoom() {
   socket.emit("joinRoom", { roomCode, name: displayName });
 }
 
-function handleLeaveRoom() {
-  if (isHost) {
-    socket.emit("closeRoom", { roomCode: currentRoomCode });
-  } else {
-    socket.emit("leaveRoom", { roomCode: currentRoomCode, name: displayName });
-  }
-
+function exitRoom() {
   clearRoomSession();
-  viewersInRoom = [];
   stopVideoSync();
   showPage("main");
   renderMainView();
-  applyDynamicTheme(getVideoMetadata().source); // Reset to local page platform
+  applyDynamicTheme(getVideoMetadata().source);
+}
+
+function handleLeaveRoom() {
+  if (socket.connected) socket.emit("leaveRoom");
+  exitRoom();
   showToast("Left the room", "info");
 }

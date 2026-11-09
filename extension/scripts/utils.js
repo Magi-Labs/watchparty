@@ -74,15 +74,14 @@ function saveDisplayName(name) {
 }
 
 /* ---------- Room Session State Helpers ---------- */
-function saveRoomSession(roomCode, hostStatus) {
+function saveRoomSession(roomCode) {
+  if (currentRoomCode !== roomCode) roomChatMessages.length = 0;
   currentRoomCode = roomCode;
-  isHost = hostStatus;
   try {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({
         type: "HUDDLE_SET_SESSION",
-        roomCode: roomCode,
-        isHost: hostStatus
+        roomCode
       }, (response) => {
         if (chrome.runtime.lastError) {
           console.warn("[Huddle] Failed to save session to background:", chrome.runtime.lastError.message);
@@ -95,8 +94,9 @@ function saveRoomSession(roomCode, hostStatus) {
 }
 
 function clearRoomSession() {
+  roomChatMessages.length = 0;
   currentRoomCode = null;
-  isHost = false;
+  roomVideoUrl = null;
   try {
     if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ type: "HUDDLE_CLEAR_SESSION" }, (response) => {
@@ -121,7 +121,6 @@ function restoreRoomSession(callback) {
         }
         if (result && result.roomCode) {
           currentRoomCode = result.roomCode;
-          isHost = !!result.isHost;
           console.log("[Huddle] Restored tab session:", result);
         }
         if (callback) callback();
@@ -146,23 +145,13 @@ function handleInvalidatedContext(err) {
 function areUrlsSameVideo(url1, url2) {
   if (!url1 || !url2) return false;
 
-  const clean1 = url1.split("#")[0];
-  const clean2 = url2.split("#")[0];
-
-  if (clean1 === clean2) return true;
-
-  // Check YouTube video ID equality to prevent redundant redirects on query parameter differences
-  if (clean1.includes("youtube.com/watch") && clean2.includes("youtube.com/watch")) {
-    try {
-      const v1 = new URL(clean1).searchParams.get("v");
-      const v2 = new URL(clean2).searchParams.get("v");
-      return v1 && v2 && v1 === v2;
-    } catch (e) {
-      return false;
-    }
+  const first = new URL(url1);
+  const second = new URL(url2);
+  if (first.origin !== second.origin || first.pathname !== second.pathname) return false;
+  if (first.hostname === "www.youtube.com" && first.pathname === "/watch") {
+    return first.searchParams.get("v") === second.searchParams.get("v");
   }
-
-  return false;
+  return true;
 }
 
 /* ---------- Check if YouTube Ad is Playing ---------- */
